@@ -34,7 +34,7 @@ const mapPago = r => r ? ({
 
 const mapUsuario = r => r ? ({
   id: r.id, nombre: r.nombre, email: r.email, password: r.password,
-  rol: r.rol, sucursal: r.sucursal, avatar: r.avatar || (r.rol === "dueno" ? "👑" : "👤"),
+  rol: r.rol, sucursal: r.sucursal, avatar: r.avatar || (r.rol === "superadmin" ? "🛡️" : r.rol === "dueno" ? "👑" : "👤"),
   activo: r.activo,
 }) : null;
 
@@ -380,6 +380,14 @@ const G = `
   @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes ping { 0% { transform: scale(1); opacity: 1; } 100% { transform: scale(2.2); opacity: 0; } }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @media (max-width: 640px) {
+    .rsp-grid2 { grid-template-columns: 1fr !important; }
+    .rsp-hide  { display: none !important; }
+    .rsp-pad   { padding: 14px !important; }
+    .rsp-fcol  { flex-direction: column !important; }
+    .rsp-full  { width: 100% !important; }
+    .rsp-wrap  { flex-wrap: wrap !important; }
+  }
 `;
 
 // ─── ATOMS ───────────────────────────────────────────────────────────────────
@@ -463,12 +471,15 @@ const Modal = ({ open, onClose, title, children, color = "#00d4ff", wide }) => {
 };
 
 // ─── LOGIN (Supabase) ─────────────────────────────────────────────────────────
-const LoginDB = ({ onLogin, loading }) => {
+const LoginDB = ({ onLogin, loading, cfgLogin }) => {
   const [email, setEmail]       = useState("");
   const [pass, setPass]         = useState("");
   const [err, setErr]           = useState("");
   const [trying, setTrying]     = useState(false);
   const [showPassLogin, setShowPassLogin] = useState(false);
+  const empresaNombre = cfgLogin?.empresa || "LAVAWASH";
+  const empresaIcono  = cfgLogin?.icono   || "🫧";
+  const empresaSlogan = cfgLogin?.slogan  || "GESTIÓN INTEGRAL · ARGENTINA";
 
   const intentar = async () => {
     if (!email || !pass) { setErr("Completá email y contraseña"); return; }
@@ -479,12 +490,12 @@ const LoginDB = ({ onLogin, loading }) => {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f0f2f8", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-      <div style={{ width: "100%", maxWidth: 420 }}>
+    <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#e8edf8 0%,#f0f2f8 60%,#e2e8f5 100%)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ width: "100%", maxWidth: 420, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ width: 64, height: 64, borderRadius: 20, background: "linear-gradient(135deg,#0ea5e9,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 16px" }}>🫧</div>
-          <div style={{ fontFamily: "Syne", fontWeight: 800, fontSize: 32, letterSpacing: 3, color: "#0ea5e9" }}>LAVAWASH</div>
-          <div style={{ color: "#9ca3af", fontSize: 13, letterSpacing: 2, marginTop: 4 }}>GESTIÓN INTEGRAL · ARGENTINA</div>
+          <div style={{ width: 64, height: 64, borderRadius: 20, background: "linear-gradient(135deg,#0ea5e9,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, margin: "0 auto 16px" }}>{empresaIcono}</div>
+          <div style={{ fontFamily: "Syne", fontWeight: 800, fontSize: 32, letterSpacing: 3, color: "#0ea5e9" }}>{empresaNombre.toUpperCase()}</div>
+          <div style={{ color: "#9ca3af", fontSize: 13, letterSpacing: 2, marginTop: 4 }}>{empresaSlogan.toUpperCase()}</div>
         </div>
         <Card glow="#0ea5e9">
           <div style={{ fontFamily: "Syne", fontWeight: 800, fontSize: 18, marginBottom: 22, color: "#1a1d2e" }}>Iniciar sesión</div>
@@ -980,7 +991,7 @@ const ModalPago = ({ pedido, cliente, onConfirm, onClose }) => {
           <div style={{ background: "#f4f5fb", border: "1px solid #009ee355", borderRadius: 12, padding: "12px 16px", fontSize: 13, color: "#009ee3", wordBreak: "break-all", marginBottom: 14 }}>{link}</div>
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
             <Btn v="mp" onClick={() => { setCopiado(true); setTimeout(() => setCopiado(false), 2000); }} style={{ flex: 1 }}>{copiado ? "✅ Copiado" : "📋 Copiar"}</Btn>
-            {cliente?.tel && <Btn v="wa" onClick={() => window.open(`https://wa.me/${cliente.tel}?text=${encodeURIComponent(`Hola ${cliente.nombre.split(" ")[0]}! Pagá tu pedido LawaWash acá 👉 ${link}`)}`, "_blank")} style={{ flex: 1 }}>📲 Enviar WA</Btn>}
+            {cliente?.tel && <Btn v="wa" onClick={() => window.open(`https://wa.me/${cliente.tel}?text=${encodeURIComponent(`Hola ${cliente.nombre.split(" ")[0]}! Pagá tu pedido acá 👉 ${link}`)}`, "_blank")} style={{ flex: 1 }}>📲 Enviar WA</Btn>}
           </div>
           <Btn v="suc" onClick={() => registrar("mp_link")} full>✅ Marcar como pagado</Btn>
           <div style={{ marginTop: 10 }}><Btn v="gho" onClick={() => setStep("elegir")} full>← Volver</Btn></div>
@@ -993,14 +1004,60 @@ const ModalPago = ({ pedido, cliente, onConfirm, onClose }) => {
 // ─── FORM CLIENTE ─────────────────────────────────────────────────────────────
 const FormCliente = ({ inicial, onGuardar, onCancelar, sucursalFija }) => {
   const [f, setF] = useState(inicial || { nombre: "", tel: "", email: "", dni: "", dir: "", sucursal: sucursalFija || 1, notas: "" });
-  const ok = f.nombre.trim() && f.tel.trim();
+  const [errores, setErrores] = useState({});
+
+  const validarCampo = (campo, valor) => {
+    if (campo === "nombre") {
+      if (!valor.trim()) return "El nombre es obligatorio";
+      if (/^\d+$/.test(valor.trim())) return "El nombre no puede ser solo números — ¿querés poner el DNI abajo?";
+    }
+    if (campo === "tel") {
+      if (!valor.trim()) return "El teléfono es obligatorio";
+      if (!/^\+?\d{7,20}$/.test(valor.replace(/[\s\-]/g, ""))) return "Solo se permiten números (ej: 5491134218800)";
+    }
+    if (campo === "email" && valor) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) return "Email inválido";
+    }
+    if (campo === "dni" && valor) {
+      if (!/^[\d\s\.\-]+$/.test(valor)) return "El DNI solo debe contener números";
+    }
+    return "";
+  };
+
+  const setField = (campo, valor) => {
+    // Teléfono y DNI: bloquear letras en el input
+    if (campo === "tel") valor = valor.replace(/[^\d\+\s\-]/g, "");
+    if (campo === "dni") valor = valor.replace(/[^\d\s\.\-]/g, "");
+    setF(prev => ({ ...prev, [campo]: valor }));
+    setErrores(prev => ({ ...prev, [campo]: validarCampo(campo, valor) }));
+  };
+
+  const hayErrores = Object.values(errores).some(e => e);
+  const ok = f.nombre.trim() && f.tel.trim() && !hayErrores;
+
+  const ErrMsg = ({ campo }) => errores[campo]
+    ? <div style={{ color: "#f87171", fontSize: 12, marginTop: 3 }}>⚠ {errores[campo]}</div>
+    : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-        <Inp label="Nombre completo *" value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} placeholder="Ej: Juan Pérez" />
-        <Inp label="WhatsApp (con cód. país) *" value={f.tel} onChange={e => setF({ ...f, tel: e.target.value })} placeholder="5491xxxxxxxx" />
-        <Inp label="Email" type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="cliente@mail.com" />
-        <Inp label="DNI" value={f.dni} onChange={e => setF({ ...f, dni: e.target.value })} placeholder="XX.XXX.XXX" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }} className="rsp-grid2">
+        <div>
+          <Inp label="Nombre completo *" value={f.nombre} onChange={e => setField("nombre", e.target.value)} placeholder="Ej: Juan Pérez" />
+          <ErrMsg campo="nombre" />
+        </div>
+        <div>
+          <Inp label="WhatsApp (solo números) *" value={f.tel} onChange={e => setField("tel", e.target.value)} placeholder="5491xxxxxxxx" inputMode="tel" />
+          <ErrMsg campo="tel" />
+        </div>
+        <div>
+          <Inp label="Email" type="email" value={f.email} onChange={e => setField("email", e.target.value)} placeholder="cliente@mail.com" />
+          <ErrMsg campo="email" />
+        </div>
+        <div>
+          <Inp label="DNI (opcional)" value={f.dni} onChange={e => setField("dni", e.target.value)} placeholder="XX.XXX.XXX" inputMode="numeric" />
+          <ErrMsg campo="dni" />
+        </div>
         <Inp label="Dirección" value={f.dir} onChange={e => setF({ ...f, dir: e.target.value })} placeholder="Calle 1234" />
         {!sucursalFija && (
           <Sel label="Sucursal habitual" value={f.sucursal} onChange={e => setF({ ...f, sucursal: Number(e.target.value) })}>
@@ -1482,7 +1539,11 @@ const FormPedido = ({ clientes, usuario, onGuardar, onCancelar, onAltaCliente, p
               <div style={{ display: "flex", alignItems: "center", gap: 10, color: "#b45309" }}>
                 <span>❌ Seleccionar un cliente</span>
                 {busqCli.length > 0 && clisFiltrados.length === 0 && (
-                  <button onClick={() => onAltaCliente && onAltaCliente(busqCli)}
+                  <button onClick={() => {
+                    // Si lo buscado parece un DNI (solo números/puntos), precargarlo en dni y limpiar nombre
+                    const esDni = /^[\d\.\s]+$/.test(busqCli.trim()) && busqCli.trim().length >= 6;
+                    onAltaCliente && onAltaCliente(esDni ? "" : busqCli, esDni ? busqCli : "");
+                  }}
                     style={{ background: "#0ea5e9", color: "#fff", border: "none", borderRadius: 8, padding: "3px 12px", fontSize: 12, cursor: "pointer", fontFamily: "Outfit", fontWeight: 600 }}>
                     + Dar de alta "{busqCli}"
                   </button>
@@ -1705,7 +1766,7 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
   const [pedPago, setPedPago] = useState(null);
   const [pedTicket, setPedTicket] = useState(null);
   const [pedPreviewWA, setPedPreviewWA] = useState({ open: false, pedido: null, tipo: "comprobante" });
-  const [altaCliModal, setAltaCliModal] = useState({ open: false, nombre: "" });
+  const [altaCliModal, setAltaCliModal] = useState({ open: false, nombre: "", dni: "" });
   const [trackingModal, setTrackingModal] = useState({ open: false, pedidoId: null, nroPed: null });
   const [guardando, setGuardando] = useState(false);
   const [modalUbicacion, setModalUbicacion] = useState({ open: false, pedido: null }); // asignar canasto al marcar Listo
@@ -1926,7 +1987,7 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
       {showForm && (
         <Card style={{ marginBottom: 20 }} glow="#00d4ff">
           <div style={{ fontFamily: "Syne", fontSize: 16, fontWeight: 800, color: "#00d4ff", marginBottom: 16 }}>NUEVO PEDIDO</div>
-          <FormPedido clientes={clientes} usuario={usuario} onGuardar={crearPedido} onCancelar={() => setShowForm(false)} onAltaCliente={(nombre) => setAltaCliModal({ open: true, nombre })} pedidos={pedidos} ubicaciones={ubicaciones} />
+          <FormPedido clientes={clientes} usuario={usuario} onGuardar={crearPedido} onCancelar={() => setShowForm(false)} onAltaCliente={(nombre, dni) => setAltaCliModal({ open: true, nombre, dni: dni || "" })} pedidos={pedidos} ubicaciones={ubicaciones} />
         </Card>
       )}
 
@@ -2046,14 +2107,14 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
         onConfirm={confirmarPago}
         onClose={() => setPedPago(null)}
       />
-      <Modal open={altaCliModal.open} onClose={() => setAltaCliModal({ open: false, nombre: "" })} title="👤 DAR DE ALTA CLIENTE" color="#34d399">
+      <Modal open={altaCliModal.open} onClose={() => setAltaCliModal({ open: false, nombre: "", dni: "" })} title="👤 DAR DE ALTA CLIENTE" color="#34d399">
         <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 16 }}>
           Completá los datos del nuevo cliente. Una vez guardado, volvé a buscarlo en el formulario de pedido.
         </div>
         <FormCliente
-          inicial={{ nombre: altaCliModal.nombre, tel: "", email: "", dni: "", dir: "", sucursal: usuario.rol === "empleado" ? usuario.sucursal : 1, notas: "" }}
+          inicial={{ nombre: altaCliModal.nombre, tel: "", email: "", dni: altaCliModal.dni || "", dir: "", sucursal: usuario.rol === "empleado" ? usuario.sucursal : 1, notas: "" }}
           onGuardar={guardarNuevoCli}
-          onCancelar={() => setAltaCliModal({ open: false, nombre: "" })}
+          onCancelar={() => setAltaCliModal({ open: false, nombre: "", dni: "" })}
           sucursalFija={usuario.rol === "empleado" ? usuario.sucursal : null}
         />
       </Modal>
@@ -4450,6 +4511,22 @@ const MENU_DUENO = [
   { id: "config", icon: "🔧", label: "Config." },
 ];
 
+// Superadmin: ve todo + panel de empresas
+const MENU_SUPERADMIN = [
+  { id: "empresas", icon: "🏢", label: "Empresas" },
+  { id: "dashboard", icon: "📊", label: "Dashboard" },
+  { id: "pedidos", icon: "👕", label: "Pedidos" },
+  { id: "clientes", icon: "👥", label: "Clientes" },
+  { id: "maquinas", icon: "⚙️", label: "Máquinas" },
+  { id: "pagos", icon: "💳", label: "Caja del día" },
+  { id: "reportes", icon: "📈", label: "Reportes" },
+  { id: "whatsapp", icon: "📲", label: "WhatsApp" },
+  { id: "insumos", icon: "📦", label: "Insumos" },
+  { id: "sucursales", icon: "📍", label: "Sucursales" },
+  { id: "usuarios", icon: "🔑", label: "Usuarios" },
+  { id: "config", icon: "🔧", label: "Config." },
+];
+
 const MENU_EMPLEADO = [
   { id: "dashboard", icon: "📊", label: "Dashboard" },
   { id: "pedidos", icon: "👕", label: "Pedidos" },
@@ -4460,11 +4537,108 @@ const MENU_EMPLEADO = [
   { id: "insumos", icon: "📦", label: "Insumos" },
 ];
 
-const TITULOS = { dashboard: "Dashboard", pedidos: "Pedidos", clientes: "Clientes", maquinas: "Máquinas", pagos: "Caja del Día", reportes: "Reportes Históricos", whatsapp: "WhatsApp", insumos: "Proveedores e Insumos", sucursales: "Sucursales", usuarios: "Gestión de Usuarios", config: "Configuración" };
+// ─── SUPERADMIN PANEL ────────────────────────────────────────────────────────
+const SuperAdminPanel = ({ toast }) => {
+  const [empresas, setEmpresas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const FORM_INIT = { nombre: "", slug: "", plan: "free", activa: true };
+  const [form, setForm] = useState(FORM_INIT);
+  const [editandoId, setEditandoId] = useState(null);
+
+  const cargar = async () => {
+    setLoading(true);
+    const { data, error } = await sb.from("organizations").select("*").order("created_at", { ascending: false });
+    if (!error) setEmpresas(data || []);
+    setLoading(false);
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const guardar = async () => {
+    if (!form.nombre || !form.slug) return;
+    if (editandoId) {
+      await sb.from("organizations").update({ nombre: form.nombre, slug: form.slug, plan: form.plan, activa: form.activa }).eq("id", editandoId);
+      toast("Empresa actualizada", "ok");
+    } else {
+      const { error } = await sb.from("organizations").insert([{ nombre: form.nombre, slug: form.slug, plan: form.plan, activa: true }]);
+      if (error) { toast(error.message, "error"); return; }
+      toast("Empresa creada", "ok");
+    }
+    setShowForm(false); setEditandoId(null); setForm(FORM_INIT);
+    await cargar();
+  };
+
+  const toggleActiva = async (id, activa) => {
+    await sb.from("organizations").update({ activa: !activa }).eq("id", id);
+    await cargar();
+  };
+
+  const PLAN_COL = { free: "#9ca3af", pro: "#0ea5e9", enterprise: "#a78bfa" };
+
+  return (
+    <div style={{ padding: 28 }}>
+      <div style={{ background: "linear-gradient(135deg,#7c3aed,#a78bfa)", borderRadius: 16, padding: "20px 24px", marginBottom: 24, color: "#fff" }}>
+        <div style={{ fontFamily: "Syne", fontSize: 22, fontWeight: 800, marginBottom: 4 }}>🛡️ Panel SuperAdmin</div>
+        <div style={{ fontSize: 13, opacity: .85 }}>Gestión global de empresas clientes. Este panel solo es visible para el rol SuperAdmin.</div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+        <Btn onClick={() => { setEditandoId(null); setForm(FORM_INIT); setShowForm(true); }}>+ Nueva empresa</Btn>
+      </div>
+
+      {showForm && (
+        <Card style={{ marginBottom: 20 }} glow="#a78bfa">
+          <div style={{ fontFamily: "Syne", fontWeight: 800, fontSize: 16, color: "#a78bfa", marginBottom: 16 }}>
+            {editandoId ? "✏️ EDITAR EMPRESA" : "➕ NUEVA EMPRESA"}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14 }}>
+            <Inp label="Nombre de la empresa *" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Lavandería San Martín" />
+            <Inp label="Slug único *" value={form.slug} onChange={e => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/\s+/g,"-") })} placeholder="lavanderia-san-martin" />
+            <Sel label="Plan" value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })}>
+              <option value="free">Free</option>
+              <option value="pro">Pro</option>
+              <option value="enterprise">Enterprise</option>
+            </Sel>
+          </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <Btn v="suc" onClick={guardar} disabled={!form.nombre || !form.slug}>💾 Guardar</Btn>
+            <Btn v="gho" onClick={() => { setShowForm(false); setEditandoId(null); setForm(FORM_INIT); }}>Cancelar</Btn>
+          </div>
+        </Card>
+      )}
+
+      {loading && <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>⏳ Cargando empresas...</div>}
+      {!loading && empresas.length === 0 && (
+        <Card><div style={{ textAlign: "center", color: "#9ca3af", padding: 20 }}>Sin empresas registradas. Creá la primera.</div></Card>
+      )}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(300px,1fr))", gap: 14 }}>
+        {empresas.map(e => (
+          <Card key={e.id} glow={e.activa ? "#a78bfa" : undefined} style={{ opacity: e.activa ? 1 : 0.5 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+              <div style={{ fontFamily: "Syne", fontWeight: 800, fontSize: 16 }}>🏢 {e.nombre}</div>
+              <Tag text={e.plan?.toUpperCase() || "FREE"} color={PLAN_COL[e.plan] || "#9ca3af"} />
+            </div>
+            <div style={{ color: "#6b7280", fontSize: 13, marginBottom: 4 }}>🔗 slug: <code style={{ background: "#f0f2f8", padding: "1px 6px", borderRadius: 4 }}>{e.slug}</code></div>
+            <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 12 }}>📅 {e.created_at ? new Date(e.created_at).toLocaleDateString("es-AR") : "—"}</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn v="gho" onClick={() => { setEditandoId(e.id); setForm({ nombre: e.nombre, slug: e.slug, plan: e.plan || "free", activa: e.activa }); setShowForm(true); }} style={{ fontSize: 12, padding: "5px 12px" }}>✏️ Editar</Btn>
+              <Btn v="gho" onClick={() => toggleActiva(e.id, e.activa)} style={{ fontSize: 12, padding: "5px 12px", color: e.activa ? "#f87171" : "#34d399" }}>
+                {e.activa ? "⏸ Suspender" : "▶ Activar"}
+              </Btn>
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const TITULOS = { empresas: "🛡️ SuperAdmin — Empresas", dashboard: "Dashboard", pedidos: "Pedidos", clientes: "Clientes", maquinas: "Máquinas", pagos: "Caja del Día", reportes: "Reportes Históricos", whatsapp: "WhatsApp", insumos: "Proveedores e Insumos", sucursales: "Sucursales", usuarios: "Gestión de Usuarios", config: "Configuración" };
 
 // ─── SIDEBAR ─────────────────────────────────────────────────────────────────
 const Sidebar = ({ vista, setVista, sucursalActiva, setSucursalActiva, col, setCol, usuario, onLogout, cfg }) => {
-  const menu = usuario.rol === "dueno" ? MENU_DUENO : MENU_EMPLEADO;
+  const menu = usuario.rol === "superadmin" ? MENU_SUPERADMIN : usuario.rol === "dueno" ? MENU_DUENO : MENU_EMPLEADO;
   const nombre = cfg?.empresa || "LAVAWASH";
   const icono  = cfg?.icono  || "🫧";
   const slogan = cfg?.slogan || "GESTIÓN INTEGRAL";
@@ -4480,11 +4654,13 @@ const Sidebar = ({ vista, setVista, sucursalActiva, setSucursalActiva, col, setC
 
       {!col && (
         <div style={{ padding: "10px 12px", borderBottom: "1px solid #2a2f45" }}>
-          <div style={{ background: usuario.rol === "dueno" ? "#fbbf2415" : "#00d4ff15", border: `1px solid ${usuario.rol === "dueno" ? "#fbbf2444" : "#00d4ff44"}`, borderRadius: 10, padding: "8px 12px" }}>
-            <div style={{ color: usuario.rol === "dueno" ? "#fbbf24" : "#38bdf8", fontSize: 12, fontWeight: 700 }}>{usuario.avatar} {usuario.nombre}</div>
-            <div style={{ color: "#9ca3af", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>{usuario.rol === "dueno" ? "👑 Supervisor" : "👤 Empleado"}</div>
+          <div style={{ background: usuario.rol === "superadmin" ? "#a78bfa15" : usuario.rol === "dueno" ? "#fbbf2415" : "#00d4ff15", border: `1px solid ${usuario.rol === "superadmin" ? "#a78bfa44" : usuario.rol === "dueno" ? "#fbbf2444" : "#00d4ff44"}`, borderRadius: 10, padding: "8px 12px" }}>
+            <div style={{ color: usuario.rol === "superadmin" ? "#a78bfa" : usuario.rol === "dueno" ? "#fbbf24" : "#38bdf8", fontSize: 12, fontWeight: 700 }}>{usuario.avatar} {usuario.nombre}</div>
+            <div style={{ color: "#9ca3af", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+              {usuario.rol === "superadmin" ? "🛡️ SuperAdmin" : usuario.rol === "dueno" ? "👑 Supervisor" : "👤 Empleado"}
+            </div>
           </div>
-          {usuario.rol === "dueno" && (
+          {(usuario.rol === "dueno" || usuario.rol === "superadmin") && (
             <select value={sucursalActiva} onChange={e => setSucursalActiva(Number(e.target.value))} style={{ background: "#252b42", border: "1px solid #3a4060", borderRadius: 8, color: "#e8eaf2", padding: "6px 10px", fontSize: 12, width: "100%", cursor: "pointer", marginTop: 8 }}>
               <option value={0}>Todas las sucursales</option>
               {SUCURSALES.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
@@ -4623,6 +4799,13 @@ export default function App() {
   const cargarUsuarios = useCallback(async () => {
     const { data, error } = await sb.from("usuarios").select("*");
     if (!error) setUsuarios((data || []).map(mapUsuario));
+  }, []);
+
+  // ── Cargar configuración antes del login (para mostrar nombre empresa) ──
+  useEffect(() => {
+    sb.from("configuracion").select("*").then(({ data }) => {
+      if (data && data.length > 0) setCfg(mapCfg(data));
+    });
   }, []);
 
   // ── Realtime subscription ──────────────────────────────────────
@@ -5024,7 +5207,7 @@ export default function App() {
 
   if (!usuario) return (
     <><style>{G}</style>
-      <LoginDB onLogin={handleLogin} loading={loading} />
+      <LoginDB onLogin={handleLogin} loading={loading} cfgLogin={cfg} />
     </>
   );
 
@@ -5061,20 +5244,21 @@ export default function App() {
                                          onCambiarEstadoMaquina={dbCambiarEstadoMaquina}
                                          usuario={usuario} toast={toast} />}
             {vista === "pagos"      && <Caja pagos={pagos} pedidos={pedidos} clientes={clientes} sucursalActiva={sucursalActiva} usuario={usuario} />}
-            {vista === "reportes"   && usuario.rol === "dueno" && <Reportes pedidos={pedidos} pagos={pagos} clientes={clientes} sucursalActiva={sucursalActiva} />}
+            {vista === "reportes"   && (usuario.rol === "dueno" || usuario.rol === "superadmin") && <Reportes pedidos={pedidos} pagos={pagos} clientes={clientes} sucursalActiva={sucursalActiva} />}
             {vista === "whatsapp"   && <WAPanel pedidos={pedidos} clientes={clientes} sucursalActiva={sucursalActiva} usuario={usuario} cfg={cfg} />}
             {vista === "insumos"    && <ProveedoresPanel usuario={usuario} proveedores={proveedores} pedidosInsumos={pedidosInsumos} onGuardarProveedor={dbGuardarProveedor} onEliminarProveedor={dbEliminarProveedor} onGuardarPedidoInsumo={dbGuardarPedidoInsumo} onActualizarEstadoInsumo={dbActualizarEstadoInsumo} toast={toast} />}
-            {vista === "sucursales" && usuario.rol === "dueno" && <Sucursales pedidos={pedidos} clientes={clientes}
+            {vista === "sucursales" && (usuario.rol === "dueno" || usuario.rol === "superadmin") && <Sucursales pedidos={pedidos} clientes={clientes}
                                          sucursales={sucursalesDB.length > 0 ? sucursalesDB : SUCURSALES}
                                          onGuardar={dbGuardarSucursal} onEliminar={dbEliminarSucursal} />}
-            {vista === "usuarios"   && usuario.rol === "dueno" && <Usuarios usuarios={usuarios}
+            {vista === "usuarios"   && (usuario.rol === "dueno" || usuario.rol === "superadmin") && <Usuarios usuarios={usuarios.filter(u => u.rol !== "superadmin")}
                                          onGuardar={dbGuardarUsuario} onToggle={dbToggleUsuario} onEliminar={dbEliminarUsuario} />}
-            {vista === "config"     && usuario.rol === "dueno" && <Configuracion cfg={cfg} setCfg={setCfg}
+            {vista === "config"     && (usuario.rol === "dueno" || usuario.rol === "superadmin") && <Configuracion cfg={cfg} setCfg={setCfg}
                                          ubicaciones={ubicaciones} onGuardarUbicacion={dbGuardarUbicacion} onEliminarUbicacion={dbEliminarUbicacion}
                                          onGuardarCfg={dbGuardarCfg}
                                          servicios={serviciosDB.length > 0 ? serviciosDB : SERVICIOS}
                                          onGuardarServicio={dbGuardarServicio} onEliminarServicio={dbEliminarServicio}
                                          logEntries={[]} />}
+            {vista === "empresas"   && usuario.rol === "superadmin" && <SuperAdminPanel toast={toast} />}
           </main>
         </div>
       </div>
