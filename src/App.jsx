@@ -269,6 +269,7 @@ const genId = (p) => {
 };
 const fmt = (n) => `$${Number(n).toLocaleString("es-AR")}`;
 const hoy = new Date().toLocaleDateString("es-AR");
+const APP_VERSION = "v1.001";
 
 // Normaliza fecha en formato DD/MM/AAAA o D/M/AAAA para comparar — elimina ceros a la izquierda
 const normFecha = (f) => {
@@ -526,6 +527,9 @@ const LoginDB = ({ onLogin, loading, cfgLogin }) => {
             Los usuarios se gestionan desde el panel del supervisor (sección Usuarios 🔑)
           </div>
         </Card>
+        <div style={{ textAlign: "center", marginTop: 16, color: "#b0b8d0", fontSize: 11, letterSpacing: 1 }}>
+          {APP_VERSION}
+        </div>
       </div>
     </div>
   );
@@ -1075,11 +1079,13 @@ const FormCliente = ({ inicial, onGuardar, onCancelar, sucursalFija }) => {
 };
 
 // ─── CLIENTES ────────────────────────────────────────────────────────────────
-const Clientes = ({ clientes, pedidos, usuario, onGuardar }) => {
+const Clientes = ({ clientes, pedidos, usuario, onGuardar, onEliminar }) => {
   const [buscar, setBuscar] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
   const [detalle, setDetalle] = useState(null);
+  const [confirmarElim1, setConfirmarElim1] = useState(null); // cliente — primera confirmación
+  const [confirmarElim2, setConfirmarElim2] = useState(null); // cliente — segunda confirmación
 
   const sucFija = usuario.rol === "empleado" ? usuario.sucursal : null;
   const lista = clientes
@@ -1090,6 +1096,9 @@ const Clientes = ({ clientes, pedidos, usuario, onGuardar }) => {
     await onGuardar(f, editando?.id || null);
     setShowForm(false); setEditando(null);
   };
+
+  // Solo dueño/superadmin puede eliminar
+  const puedeEliminar = usuario.rol === "dueno" || usuario.rol === "superadmin";
 
   return (
     <div style={{ padding: 28 }}>
@@ -1125,9 +1134,12 @@ const Clientes = ({ clientes, pedidos, usuario, onGuardar }) => {
               {c.dni && <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 2 }}>🪪 {c.dni}</div>}
               {suc && <div style={{ color: "#6b7280", fontSize: 12, marginBottom: 8 }}>📍 {suc.nombre}</div>}
               {c.notas && <div style={{ color: "#6b7280", fontSize: 12, fontStyle: "italic", marginBottom: 10 }}>"{c.notas}"</div>}
-              <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                 <Btn v="gho" onClick={() => setDetalle(c)} style={{ fontSize: 12, padding: "5px 12px" }}>Ver historial</Btn>
                 <Btn v="gho" onClick={() => { setEditando(c); setShowForm(true); }} style={{ fontSize: 12, padding: "5px 12px" }}>✏️ Editar</Btn>
+                {puedeEliminar && (
+                  <Btn v="gho" onClick={() => setConfirmarElim1(c)} style={{ fontSize: 12, padding: "5px 12px", color: "#f87171", borderColor: "#f8717155" }}>🗑️</Btn>
+                )}
               </div>
             </Card>
           );
@@ -1183,6 +1195,49 @@ const Clientes = ({ clientes, pedidos, usuario, onGuardar }) => {
             </div>
           );
         })()}
+      </Modal>
+
+      {/* Modal confirmar eliminar — primera confirmación */}
+      <Modal open={!!confirmarElim1} onClose={() => setConfirmarElim1(null)} title="🗑️ Eliminar cliente" color="#f87171">
+        {confirmarElim1 && (
+          <div>
+            <div style={{ color: "#374151", marginBottom: 16, lineHeight: 1.6 }}>
+              ¿Estás seguro de que querés eliminar al cliente <strong>{confirmarElim1.nombre}</strong>?
+            </div>
+            {pedidos.filter(p => p.clienteId === confirmarElim1.id && p.estado !== "Entregado").length > 0 && (
+              <div style={{ background: "#fef2f2", border: "1px solid #f8717133", borderRadius: 10, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#92400e" }}>
+                ⚠️ Este cliente tiene <strong>{pedidos.filter(p => p.clienteId === confirmarElim1.id && p.estado !== "Entregado").length} pedidos activos</strong>. Asegurate de resolverlos antes de eliminar.
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn v="dan" onClick={() => { setConfirmarElim2(confirmarElim1); setConfirmarElim1(null); }} style={{ flex: 1 }}>
+                Sí, continuar
+              </Btn>
+              <Btn v="gho" onClick={() => setConfirmarElim1(null)} style={{ flex: 1 }}>Cancelar</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal confirmar eliminar — segunda confirmación */}
+      <Modal open={!!confirmarElim2} onClose={() => setConfirmarElim2(null)} title="⚠️ Confirmar eliminación definitiva" color="#f87171">
+        {confirmarElim2 && (
+          <div>
+            <div style={{ color: "#374151", marginBottom: 12, lineHeight: 1.6 }}>
+              Última confirmación: vas a eliminar permanentemente a <strong>{confirmarElim2.nombre}</strong> y todos sus datos.<br/>
+              <span style={{ color: "#f87171", fontWeight: 600 }}>Esta acción no se puede deshacer.</span>
+            </div>
+            <div style={{ background: "#fef2f2", border: "1px solid #f87171", borderRadius: 10, padding: "10px 14px", marginBottom: 18, fontSize: 13, color: "#b91c1c" }}>
+              ⚠️ Sus pedidos quedarán sin cliente asociado. Procedé solo si estás completamente seguro.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn v="dan" onClick={() => { onEliminar(confirmarElim2.id); setConfirmarElim2(null); }} style={{ flex: 1 }}>
+                🗑️ Sí, eliminar definitivamente
+              </Btn>
+              <Btn v="gho" onClick={() => setConfirmarElim2(null)} style={{ flex: 1 }}>Cancelar</Btn>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );
@@ -2202,10 +2257,11 @@ const Maquinas = ({ sucursalActiva, pedidos, maquinas: maqProp, onCambiarEstado,
   const [ahora, setAhora]     = useState(Date.now());
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [confirmarElimMaq, setConfirmarElimMaq] = useState(null); // {id, tipo}
   const formRef = useRef(null);
   const FORM_INIT = { tipo: "Lavadora", capacidad: "", sucursal: sucursalActiva || 1, estado: "Disponible" };
   const [form, setForm] = useState(FORM_INIT);
-  const isDueno = usuario?.rol === "dueno";
+  const isDueno = usuario?.rol === "dueno" || usuario?.rol === "superadmin";
 
   useEffect(() => {
     const t = setInterval(() => setAhora(Date.now()), 30000);
@@ -2317,8 +2373,13 @@ const Maquinas = ({ sucursalActiva, pedidos, maquinas: maqProp, onCambiarEstado,
                         <div style={{ color:"#6b7280", fontSize:11 }}>{maq.id}{maq.capacidad ? ` · ${maq.capacidad}` : ""}</div>
                       </div>
                       {isDueno && (
-                        <button onClick={() => abrirForm(maq)}
-                          style={{ background:"none", border:"1px solid #d0d5e8", borderRadius:8, padding:"2px 7px", cursor:"pointer", fontSize:12 }}>✏️</button>
+                        <div style={{ display:"flex", gap:4 }}>
+                          <button onClick={() => abrirForm(maq)}
+                            style={{ background:"none", border:"1px solid #d0d5e8", borderRadius:8, padding:"2px 7px", cursor:"pointer", fontSize:12 }}>✏️</button>
+                          <button onClick={() => setConfirmarElimMaq({ id: maq.id, tipo: maq.tipo, sucursal: suc.nombre })}
+                            title="Eliminar máquina"
+                            style={{ background:"none", border:"1px solid #fca5a5", borderRadius:8, padding:"2px 7px", cursor:"pointer", fontSize:12, color:"#f87171" }}>🗑️</button>
+                        </div>
                       )}
                     </div>
                     {!pedActivo && maq.estado === "Disponible" && (
@@ -2376,6 +2437,27 @@ const Maquinas = ({ sucursalActiva, pedidos, maquinas: maqProp, onCambiarEstado,
           </Card>
         );
       })}
+
+      {/* Modal confirmación eliminar máquina */}
+      <Modal open={!!confirmarElimMaq} onClose={() => setConfirmarElimMaq(null)} title="⚠️ Eliminar máquina" color="#f87171">
+        {confirmarElimMaq && (
+          <div>
+            <div style={{ color:"#374151", marginBottom:16, lineHeight:1.6 }}>
+              Estás por eliminar la máquina <strong>{confirmarElimMaq.tipo}</strong> ({confirmarElimMaq.id}) de <strong>{confirmarElimMaq.sucursal}</strong>.<br/>
+              <span style={{ color:"#f87171" }}>Esta acción no se puede deshacer.</span>
+            </div>
+            <div style={{ background:"#fef2f2", border:"1px solid #f8717133", borderRadius:10, padding:"10px 14px", marginBottom:18, fontSize:13, color:"#92400e" }}>
+              ⚠️ Asegurate de que no haya pedidos activos asignados a esta máquina antes de eliminarla.
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <Btn v="dan" onClick={() => { onEliminarMaquina(confirmarElimMaq.id); setConfirmarElimMaq(null); }} style={{ flex:1 }}>
+                🗑️ Sí, eliminar máquina
+              </Btn>
+              <Btn v="gho" onClick={() => setConfirmarElimMaq(null)} style={{ flex:1 }}>Cancelar</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
@@ -2386,8 +2468,9 @@ const Dashboard = ({ pedidos, pagos, clientes, sucursalActiva, usuario }) => {
   useEffect(() => { const t = setInterval(() => setAhora(Date.now()), 30000); return () => clearInterval(t); }, []);
   const sucFija = usuario.rol === "empleado" ? usuario.sucursal : sucursalActiva;
   const filtrar = arr => sucFija === 0 ? arr : arr.filter(p => p.sucursal === sucFija);
-  const ped = filtrar(pedidos);
-  const pag = filtrar(pagos);
+  // Dashboard muestra SOLO datos de hoy
+  const ped = filtrar(pedidos).filter(p => normFecha(p.fechaIngreso) === normFecha(hoy));
+  const pag = filtrar(pagos).filter(p => normFecha(p.fecha || hoy) === normFecha(hoy));
   const pendInicio= ped.filter(p => p.estado === "Pendiente").length;
   const enUso    = ped.filter(p => p.estado === "En uso").length;
   const listos   = ped.filter(p => p.estado === "Listo").length;
@@ -2665,7 +2748,8 @@ const Caja = ({ pagos, pedidos, clientes, sucursalActiva, usuario }) => {
   const esEmpleado = usuario.rol === "empleado";
   const sucFija = esEmpleado ? usuario.sucursal : sucursalActiva;
   const filtrar = arr => sucFija === 0 ? arr : arr.filter(p => p.sucursal === sucFija);
-  const pags = filtrar(pagos);
+  // Caja Diaria: solo muestra los pagos del día de hoy
+  const pags = filtrar(pagos).filter(p => normFecha(p.fecha || hoy) === normFecha(hoy));
 
   // Empleado: solo ve efectivo (para cierre de caja manual)
   const pagsEfectivo = pags.filter(p => p.metodo === "efectivo");
@@ -4273,9 +4357,35 @@ const Reportes = ({ pedidos, pagos, clientes, sucursalActiva }) => {
   const todosPedidos = [...pedidos, ...PEDIDOS_HIST];
   const todosPagos   = [...pagos,   ...PEDIDOS_HIST.map(p => ({ id:"PAG-H"+p.id, pedido:p.id, clienteId:p.clienteId, monto:p.monto, metodo:p.metodoPago, sucursal:p.sucursal, fecha:p.fechaIngreso }))];
 
-  const filtrar = arr => sucFiltro === 0 ? arr : arr.filter(x => x.sucursal === sucFiltro);
-  const ped = filtrar(todosPedidos);
-  const pag = filtrar(todosPagos);
+  // ── Filtro por período ──────────────────────────────────────────────────────
+  const parseFechaAR = (str) => {
+    if (!str) return null;
+    // Acepta DD/MM/AAAA o AAAA-MM-DD
+    if (str.includes("-")) {
+      const [a, m, d] = str.split("-");
+      return new Date(Number(a), Number(m) - 1, Number(d));
+    }
+    const [d, m, a] = str.split("/");
+    if (!d || !m || !a) return null;
+    return new Date(Number(a), Number(m) - 1, Number(d));
+  };
+
+  const filtrarPorPeriodo = (arr) => {
+    const hoyDate = new Date();
+    hoyDate.setHours(0, 0, 0, 0);
+    if (periodo === "total") return arr;
+    const limite = new Date(hoyDate);
+    if (periodo === "semana") limite.setDate(hoyDate.getDate() - 6);
+    else if (periodo === "mes") limite.setDate(hoyDate.getDate() - 29);
+    return arr.filter(p => {
+      const f = parseFechaAR(p.fecha || p.fechaIngreso);
+      return f && f >= limite;
+    });
+  };
+
+  const filtrarSuc = arr => sucFiltro === 0 ? arr : arr.filter(x => x.sucursal === sucFiltro);
+  const ped = filtrarPorPeriodo(filtrarSuc(todosPedidos));
+  const pag = filtrarPorPeriodo(filtrarSuc(todosPagos));
 
   // Agrupar pagos por fecha (simulado para distintos períodos)
   const agruparPorFecha = (arr) => {
@@ -4295,8 +4405,8 @@ const Reportes = ({ pedidos, pagos, clientes, sucursalActiva }) => {
   // Por sucursal
   const porSucursal = SUCURSALES.map(s => ({
     ...s,
-    pedidos: todosPedidos.filter(p=>p.sucursal===s.id).length,
-    total: todosPagos.filter(p=>p.sucursal===s.id).reduce((a,p)=>a+p.monto,0),
+    pedidos: ped.filter(p=>p.sucursal===s.id).length,
+    total: pag.filter(p=>p.sucursal===s.id).reduce((a,p)=>a+p.monto,0),
     clientes: clientes.filter(c=>c.sucursal===s.id).length,
   }));
 
@@ -4930,6 +5040,13 @@ export default function App() {
     }
   };
 
+  const dbEliminarCliente = async (id) => {
+    const { error } = await sb.from("clientes").delete().eq("id", id);
+    if (error) { toast(error.message, "error"); return; }
+    toast("Cliente eliminado", "ok");
+    await cargarDatos();
+  };
+
   // ── CRUD: Usuarios ────────────────────────────────────────────
   const dbGuardarUsuario = async (form, editandoId) => {
     if (editandoId) {
@@ -5237,7 +5354,7 @@ export default function App() {
                                          onCrear={dbCrearPedido} onCambiarEstado={dbCambiarEstado}
                                          onConfirmarPago={dbConfirmarPago} onGuardarCliente={dbGuardarCliente}
                                          onActualizarPedido={dbActualizarPedido} ubicaciones={ubicaciones} toast={toast} />}
-            {vista === "clientes"   && <Clientes clientes={clientes} pedidos={pedidos} usuario={usuario} onGuardar={dbGuardarCliente} />}
+            {vista === "clientes"   && <Clientes clientes={clientes} pedidos={pedidos} usuario={usuario} onGuardar={dbGuardarCliente} onEliminar={dbEliminarCliente} />}
             {vista === "maquinas"   && <Maquinas sucursalActiva={sucFija} pedidos={pedidos}
                                          maquinas={maquinasDB} onCambiarEstado={dbCambiarEstado}
                                          onGuardarMaquina={dbGuardarMaquina} onEliminarMaquina={dbEliminarMaquina}
