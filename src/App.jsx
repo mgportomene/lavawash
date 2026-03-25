@@ -34,7 +34,9 @@ const mapPago = r => r ? ({
 
 const mapUsuario = r => r ? ({
   id: r.id, nombre: r.nombre, email: r.email, password: r.password,
-  rol: r.rol, sucursal: r.sucursal, avatar: r.avatar || (r.rol === "superadmin" ? "🛡️" : r.rol === "dueno" ? "👑" : "👤"),
+  rol: r.rol, sucursal: r.sucursal,
+  orgId: r.org_id || null,
+  avatar: r.avatar || (r.rol === "superadmin" ? "🛡️" : r.rol === "dueno" ? "👑" : "👤"),
   activo: r.activo,
 }) : null;
 
@@ -3643,10 +3645,13 @@ const UbicacionesPanel = ({ ubicaciones: ubiProp, onGuardar, onEliminar }) => {
   const [form, setForm] = useState(FORM_INIT);
   const [editandoId, setEditandoId] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [confirmarElimUbi, setConfirmarElimUbi] = useState(null);
+  const formRef = useRef(null);
 
   const abrir = (u = null) => {
     setEditandoId(u?.id || null);
     setForm(u ? { nombre: u.nombre, descripcion: u.descripcion || "", sucursal: u.sucursal || 1 } : FORM_INIT);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
   };
 
   const guardar = async () => {
@@ -3665,7 +3670,7 @@ const UbicacionesPanel = ({ ubicaciones: ubiProp, onGuardar, onEliminar }) => {
       </div>
 
       {/* Form */}
-      <div style={{ background:"#f0f9ff", border:"1px solid #0ea5e933", borderRadius:14, padding:18, marginBottom:20 }}>
+      <div ref={formRef} style={{ scrollMarginTop:80, background:"#f0f9ff", border:"1px solid #0ea5e933", borderRadius:14, padding:18, marginBottom:20 }}>
         <div style={{ fontWeight:700, fontSize:13, color:"#1a1d2e", marginBottom:12 }}>
           {editandoId ? "✏️ Editar ubicación" : "➕ Nueva ubicación"}
         </div>
@@ -3700,12 +3705,32 @@ const UbicacionesPanel = ({ ubicaciones: ubiProp, onGuardar, onEliminar }) => {
               </div>
               <div style={{ display:"flex", gap:6, flexShrink:0 }}>
                 <button onClick={() => abrir(u)} style={{ background:"none", border:"1px solid #d0d5e8", borderRadius:8, padding:"4px 8px", cursor:"pointer", fontSize:13 }}>✏️</button>
-                <button onClick={() => onEliminar(u.id)} style={{ background:"none", border:"1px solid #fca5a5", borderRadius:8, padding:"4px 8px", cursor:"pointer", fontSize:13 }}>🗑️</button>
+                <button onClick={() => setConfirmarElimUbi(u)} style={{ background:"none", border:"1px solid #fca5a5", borderRadius:8, padding:"4px 8px", cursor:"pointer", fontSize:13, color:"#f87171" }}>🗑️</button>
               </div>
             </div>
           );
         })}
       </div>
+
+      {/* Modal confirmación eliminar ubicación */}
+      <Modal open={!!confirmarElimUbi} onClose={() => setConfirmarElimUbi(null)} title="⚠️ Eliminar ubicación" color="#f87171">
+        {confirmarElimUbi && (
+          <div>
+            <div style={{ color:"#374151", marginBottom:12, lineHeight:1.6 }}>
+              ¿Eliminás la ubicación <strong>🧺 {confirmarElimUbi.nombre}</strong>?
+            </div>
+            <div style={{ background:"#fef2f2", border:"1px solid #f8717133", borderRadius:10, padding:"10px 14px", marginBottom:18, fontSize:13, color:"#92400e" }}>
+              ⚠️ Los pedidos que tengan esta ubicación asignada la perderán. Esta acción no se puede deshacer.
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <Btn v="dan" onClick={() => { onEliminar(confirmarElimUbi.id); setConfirmarElimUbi(null); }} style={{ flex:1 }}>
+                🗑️ Sí, eliminar
+              </Btn>
+              <Btn v="gho" onClick={() => setConfirmarElimUbi(null)} style={{ flex:1 }}>Cancelar</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 };
@@ -3720,11 +3745,14 @@ const ServiciosPanel = ({ servicios, onGuardar, onEliminar }) => {
   const [form, setForm] = useState(FORM_INIT);
   const [editandoId, setEditandoId] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [confirmarElimSrv, setConfirmarElimSrv] = useState(null);
+  const formRef = useRef(null);
   const set = (k,v) => setForm(p => ({...p,[k]:v}));
 
   const abrir = (s = null) => {
     setEditandoId(s?.id || null);
     setForm(s ? { nombre:s.nombre, precio:String(s.precio), duracion:String(s.duracion), icon:s.icon, color:s.color } : FORM_INIT);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior:"smooth", block:"start" }), 80);
   };
 
   const guardar = async () => {
@@ -3740,7 +3768,7 @@ const ServiciosPanel = ({ servicios, onGuardar, onEliminar }) => {
       <div style={{ fontFamily:"Syne", fontWeight:800, fontSize:17, color:"#f59e0b", marginBottom:18 }}>🛎 GESTIÓN DE SERVICIOS</div>
 
       {/* Form */}
-      <div style={{ background:"#fffbeb", border:"1px solid #fbbf2433", borderRadius:14, padding:18, marginBottom:20 }}>
+      <div ref={formRef} style={{ scrollMarginTop:80, background:"#fffbeb", border:"1px solid #fbbf2433", borderRadius:14, padding:18, marginBottom:20 }}>
         <div style={{ fontWeight:700, fontSize:13, color:"#1a1d2e", marginBottom:12 }}>
           {editandoId ? "✏️ Editar servicio" : "➕ Nuevo servicio"}
         </div>
@@ -3803,11 +3831,31 @@ const ServiciosPanel = ({ servicios, onGuardar, onEliminar }) => {
             </div>
             <div style={{ display:"flex", gap:8 }}>
               <Btn v="gho" onClick={() => abrir(s)} style={{ fontSize:12, padding:"5px 12px" }}>✏️ Editar</Btn>
-              <Btn v="dan" onClick={() => onEliminar(s.id)} style={{ fontSize:12, padding:"5px 12px" }}>🗑 Quitar</Btn>
+              <Btn v="dan" onClick={() => setConfirmarElimSrv(s)} style={{ fontSize:12, padding:"5px 12px" }}>🗑️ Eliminar</Btn>
             </div>
           </div>
         ))}
       </div>
+
+      {/* Modal confirmación eliminar servicio */}
+      <Modal open={!!confirmarElimSrv} onClose={() => setConfirmarElimSrv(null)} title="⚠️ Eliminar servicio" color="#f87171">
+        {confirmarElimSrv && (
+          <div>
+            <div style={{ color:"#374151", marginBottom:12, lineHeight:1.6 }}>
+              ¿Estás seguro de que querés eliminar el servicio <strong>{confirmarElimSrv.icon} {confirmarElimSrv.nombre}</strong>?
+            </div>
+            <div style={{ background:"#fef2f2", border:"1px solid #f8717133", borderRadius:10, padding:"10px 14px", marginBottom:18, fontSize:13, color:"#92400e" }}>
+              ⚠️ Los pedidos existentes con este servicio no se verán afectados, pero ya no podrás crear nuevos pedidos con él.
+            </div>
+            <div style={{ display:"flex", gap:10 }}>
+              <Btn v="dan" onClick={() => { onEliminar(confirmarElimSrv.id); setConfirmarElimSrv(null); }} style={{ flex:1 }}>
+                🗑️ Sí, eliminar servicio
+              </Btn>
+              <Btn v="gho" onClick={() => setConfirmarElimSrv(null)} style={{ flex:1 }}>Cancelar</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
     </Card>
   );
 };
@@ -4190,6 +4238,7 @@ const Usuarios = ({ usuarios, onGuardar, onToggle, onEliminar }) => {
   const FORM_INIT = { nombre: "", email: "", password: "", rol: "empleado", sucursal: 1, activo: true };
   const [form, setForm] = useState(FORM_INIT);
   const [showPass, setShowPass] = useState(false);
+  const [confirmarElimU, setConfirmarElimU] = useState(null);
   const formRef = useRef(null);
 
   const abrir = (u = null) => {
@@ -4216,10 +4265,12 @@ const Usuarios = ({ usuarios, onGuardar, onToggle, onEliminar }) => {
     if (u.rol === "dueno" && u.activo && usuarios.filter(x => x.rol === "dueno" && x.activo).length === 1) { alert("Debe haber al menos un supervisor activo"); return; }
     await onToggle(id, !u.activo);
   };
-  const eliminar = async (id) => {
-    if (usuarios.filter(u => u.rol === "dueno").length === 1 && usuarios.find(u => u.id === id)?.rol === "dueno") { alert("Debe haber al menos un supervisor"); return; }
-    if (!confirm("¿Eliminar este usuario?")) return;
-    await onEliminar(id);
+
+  const eliminar = async (u) => {
+    if (usuarios.filter(x => x.rol === "dueno").length === 1 && u.rol === "dueno") {
+      alert("Debe haber al menos un supervisor"); return;
+    }
+    setConfirmarElimU(u);
   };
 
   const ROL_COL = { dueno: "#fbbf24", empleado: "#00d4ff" };
@@ -4294,12 +4345,32 @@ const Usuarios = ({ usuarios, onGuardar, onToggle, onEliminar }) => {
                 <Btn v="gho" onClick={() => toggleActivo(u.id)} style={{ fontSize: 12, padding: "5px 12px", color: u.activo !== false ? "#f87171" : "#34d399" }}>
                   {u.activo !== false ? "⏸ Desactivar" : "▶ Activar"}
                 </Btn>
-                <Btn v="dan" onClick={() => { if (window.confirm(`¿Eliminar a ${u.nombre}?`)) eliminar(u.id); }} style={{ fontSize: 12, padding: "5px 12px" }}>🗑</Btn>
+                <Btn v="dan" onClick={() => eliminar(u)} style={{ fontSize: 12, padding: "5px 12px" }}>🗑️ Eliminar</Btn>
               </div>
             </Card>
           );
         })}
       </div>
+
+      {/* Modal confirmación eliminar usuario */}
+      <Modal open={!!confirmarElimU} onClose={() => setConfirmarElimU(null)} title="⚠️ Eliminar usuario" color="#f87171">
+        {confirmarElimU && (
+          <div>
+            <div style={{ color: "#374151", marginBottom: 12, lineHeight: 1.6 }}>
+              ¿Estás seguro de que querés eliminar al usuario <strong>{confirmarElimU.nombre}</strong> ({confirmarElimU.email})?
+            </div>
+            <div style={{ background: "#fef2f2", border: "1px solid #f8717133", borderRadius: 10, padding: "10px 14px", marginBottom: 18, fontSize: 13, color: "#92400e" }}>
+              ⚠️ Esta acción no se puede deshacer. Si solo querés que no pueda ingresar, usá <strong>Desactivar</strong> en su lugar.
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <Btn v="dan" onClick={async () => { await onEliminar(confirmarElimU.id); setConfirmarElimU(null); }} style={{ flex: 1 }}>
+                🗑️ Sí, eliminar usuario
+              </Btn>
+              <Btn v="gho" onClick={() => setConfirmarElimU(null)} style={{ flex: 1 }}>Cancelar</Btn>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
@@ -4498,8 +4569,10 @@ const Reportes = ({ pedidos, pagos, clientes, sucursalActiva }) => {
       <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
         {TABS_R.map(t=>(
           <button key={t.id} onClick={()=>setTabR(t.id)} style={{
-            padding:"7px 14px", borderRadius:10, border:"none", cursor:"pointer", fontSize:13,
-            background:tabR===t.id?"#a78bfa":"#12122a", color:tabR===t.id?"#fff":"#666", fontFamily:"Outfit"
+            padding:"7px 14px", borderRadius:10, border:"1px solid #d0d5e8", cursor:"pointer", fontSize:13,
+            background:tabR===t.id?"#a78bfa":"#f0f2f8",
+            color:tabR===t.id?"#fff":"#374151",
+            fontFamily:"Outfit", fontWeight: tabR===t.id ? 600 : 400
           }}>{t.label}</button>
         ))}
       </div>
@@ -4863,17 +4936,21 @@ export default function App() {
   // ── Load all data from Supabase ────────────────────────────────
   const cargarDatos = useCallback(async () => {
     try {
+      // Filtrar todos los datos por org_id si el usuario tiene uno (multiempresa)
+      const orgId = usuario?.orgId;
+      const qBase = (tabla) => orgId ? sb.from(tabla).eq("org_id", orgId) : sb.from(tabla);
+
       const [rPed, rPag, rCli, rUbi, rSuc, rCfg, rSrv, rMaq, rProv, rIns] = await Promise.all([
-        sb.from("pedidos").select("*").order("created_at", { ascending: false }),
-        sb.from("pagos").select("*").order("created_at", { ascending: false }),
-        sb.from("clientes").select("*").order("nombre"),
-        sb.from("ubicaciones").select("*").eq("activo", true).order("nombre"),
-        sb.from("sucursales").select("*").eq("activa", true).order("id"),
-        sb.from("configuracion").select("*"),
-        sb.from("servicios").select("*").eq("activo", true).order("orden"),
-        sb.from("maquinas").select("*").eq("activa", true).order("sucursal").order("orden"),
-        sb.from("proveedores").select("*").eq("activo", true).order("nombre"),
-        sb.from("pedidos_insumos").select("*").order("created_at", { ascending: false }),
+        qBase("pedidos").select("*").order("created_at", { ascending: false }),
+        qBase("pagos").select("*").order("created_at", { ascending: false }),
+        qBase("clientes").select("*").order("nombre"),
+        qBase("ubicaciones").select("*").eq("activo", true).order("nombre"),
+        qBase("sucursales").select("*").eq("activa", true).order("id"),
+        qBase("configuracion").select("*"),
+        qBase("servicios").select("*").eq("activo", true).order("orden"),
+        qBase("maquinas").select("*").eq("activa", true).order("sucursal").order("orden"),
+        qBase("proveedores").select("*").eq("activo", true).order("nombre"),
+        qBase("pedidos_insumos").select("*").order("created_at", { ascending: false }),
       ]);
       if (rPed.error) throw rPed.error;
       if (rPag.error) throw rPag.error;
@@ -5318,6 +5395,11 @@ export default function App() {
     const u = mapUsuario(data);
     setUsuario(u);
     if (u.rol === "empleado") setSucursalActiva(u.sucursal);
+    // Si tiene org_id, cargar la configuración específica de esa empresa
+    if (u.orgId) {
+      const { data: cfgData } = await sb.from("configuracion").select("*").eq("org_id", u.orgId);
+      if (cfgData && cfgData.length > 0) setCfg(mapCfg(cfgData));
+    }
     await cargarUsuarios();
     return true;
   };
