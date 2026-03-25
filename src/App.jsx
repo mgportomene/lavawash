@@ -2758,7 +2758,8 @@ const Caja = ({ pagos, pedidos, clientes, sucursalActiva, usuario }) => {
   const totalEfectivo = pagsEfectivo.reduce((a, p) => a + p.monto, 0);
   const total = pags.reduce((a, p) => a + p.monto, 0);
   const porMetodo = pags.reduce((acc, p) => { acc[p.metodo] = (acc[p.metodo] || 0) + p.monto; return acc; }, {});
-  const porSuc = SUCURSALES.map(s => ({ ...s, total: pagos.filter(p => p.sucursal === s.id).reduce((a, p) => a + p.monto, 0) }));
+  // porSuc también usa pags (ya filtrado por hoy) — no pagos acumulados
+  const porSuc = SUCURSALES.map(s => ({ ...s, total: pags.filter(p => p.sucursal === s.id).reduce((a, p) => a + p.monto, 0) }));
   const [exportando, setExportando] = useState(false);
 
   const handleExport = () => {
@@ -4421,8 +4422,12 @@ const MET_NAMES  = { efectivo:"Efectivo", mp_qr:"MP QR", mp_link:"MP Link", tran
 
 const Reportes = ({ pedidos, pagos, clientes, sucursalActiva }) => {
   const [periodo, setPeriodo] = useState("semana");
+  // sucFiltro sigue al sidebar automáticamente
   const [sucFiltro, setSucFiltro] = useState(sucursalActiva || 0);
   const [tabR, setTabR] = useState("recaudacion");
+
+  // Sincronizar cuando el usuario cambia sucursal desde el sidebar
+  useEffect(() => { setSucFiltro(sucursalActiva || 0); }, [sucursalActiva]);
 
   // Combinamos pedidos actuales + históricos
   const todosPedidos = [...pedidos, ...PEDIDOS_HIST];
@@ -4528,13 +4533,13 @@ const Reportes = ({ pedidos, pagos, clientes, sucursalActiva }) => {
 
   return (
     <div style={{ padding: 28, display:"flex", flexDirection:"column", gap:20 }}>
-      {/* Filtros */}
+      {/* Filtros — período + indicador sucursal activa */}
       <div style={{ display:"flex", justifyContent:"space-between", flexWrap:"wrap", gap:12 }}>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
-          <Sel value={sucFiltro} onChange={e=>setSucFiltro(Number(e.target.value))} style={{ fontSize:13, padding:"7px 12px" }}>
-            <option value={0}>Todas las sucursales</option>
-            {SUCURSALES.map(s=><option key={s.id} value={s.id}>{s.nombre}</option>)}
-          </Sel>
+          {/* Indicador de sucursal activa (controlada desde el sidebar) */}
+          <div style={{ background:"#f0f2f8", border:"1px solid #d0d5e8", borderRadius:99, padding:"7px 14px", fontSize:13, color:"#374151", display:"flex", alignItems:"center", gap:6 }}>
+            📍 {sucFiltro === 0 ? "Todas las sucursales" : SUCURSALES.find(s=>s.id===sucFiltro)?.nombre || "Sucursal"}
+          </div>
           {["semana","mes","total"].map(p=>(
             <button key={p} onClick={()=>setPeriodo(p)} style={{
               padding:"7px 14px", borderRadius:99, border:"none", cursor:"pointer", fontSize:13,
@@ -4936,9 +4941,9 @@ export default function App() {
   // ── Load all data from Supabase ────────────────────────────────
   const cargarDatos = useCallback(async () => {
     try {
-      // Filtrar todos los datos por org_id si el usuario tiene uno (multiempresa)
+      // Filtrar todos los datos por organization_id si el usuario tiene uno (multiempresa)
       const orgId = usuario?.orgId;
-      const qBase = (tabla) => orgId ? sb.from(tabla).eq("org_id", orgId) : sb.from(tabla);
+      const qBase = (tabla) => orgId ? sb.from(tabla).eq("organization_id", orgId) : sb.from(tabla);
 
       const [rPed, rPag, rCli, rUbi, rSuc, rCfg, rSrv, rMaq, rProv, rIns] = await Promise.all([
         qBase("pedidos").select("*").order("created_at", { ascending: false }),
@@ -5028,6 +5033,7 @@ export default function App() {
       progreso: pedido.progreso, estado_pago: pedido.estadoPago,
       metodo_pago: pedido.metodoPago, monto: pedido.monto, obs: pedido.obs,
       ubicacion_canasto: pedido.ubicacionCanasto || null,
+      ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
     }]).select().single();
     if (error) { toast(error.message, "error", "Error al crear pedido"); return null; }
     // Tracking inicial
@@ -5089,6 +5095,7 @@ export default function App() {
       id: pagoId, pedido_id: ped.id, cliente_id: ped.clienteId,
       monto: ped.monto, metodo, hora: horaActual(),
       sucursal: ped.sucursal, fecha: hoy,
+      ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
     }]);
     toast("Pago registrado correctamente", "ok");
     await cargarDatos();
@@ -5109,6 +5116,7 @@ export default function App() {
       const { error } = await sb.from("clientes").insert([{
         id, nombre: f.nombre, tel: f.tel, email: f.email, dni: f.dni,
         dir: f.dir, sucursal: Number(f.sucursal) || 1, notas: f.notas,
+        ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
       }]);
       if (error) { toast(error.message, "error"); return null; }
       toast(`Cliente ${f.nombre} guardado`, "ok");
@@ -5138,6 +5146,7 @@ export default function App() {
         nombre: form.nombre, email: form.email, password: form.password,
         rol: form.rol, sucursal: form.rol === "dueno" ? null : Number(form.sucursal),
         activo: true, avatar: form.rol === "dueno" ? "👑" : "👤",
+        ...(usuario.orgId ? { org_id: usuario.orgId } : {}),
       }]);
     }
     await cargarUsuarios();
@@ -5164,7 +5173,7 @@ export default function App() {
     if (editandoId) {
       await sb.from("ubicaciones").update({ nombre: f.nombre, descripcion: f.descripcion, sucursal: Number(f.sucursal) }).eq("id", editandoId);
     } else {
-      await sb.from("ubicaciones").insert([{ nombre: f.nombre, descripcion: f.descripcion, sucursal: Number(f.sucursal), activo: true }]);
+      await sb.from("ubicaciones").insert([{ nombre: f.nombre, descripcion: f.descripcion, sucursal: Number(f.sucursal), activo: true, ...(usuario.orgId ? { organization_id: usuario.orgId } : {}) }]);
     }
     const { data } = await sb.from("ubicaciones").select("*").eq("activo", true).order("nombre");
     setUbicaciones((data || []).map(mapUbicacion));
@@ -5197,7 +5206,7 @@ export default function App() {
       const { error } = await sb.from("sucursales").update(row).eq("id", editandoId);
       if (error) { toast(error.message, "error"); return; }
     } else {
-      const { data, error } = await sb.from("sucursales").insert([row]).select().single();
+      const { data, error } = await sb.from("sucursales").insert([{ ...row, ...(usuario.orgId ? { organization_id: usuario.orgId } : {}) }]).select().single();
       if (error) { toast(error.message, "error"); return; }
       newId = data.id;
     }
@@ -5238,7 +5247,12 @@ export default function App() {
     ];
     const errors = [];
     for (const row of rows) {
-      const { error } = await sb.from("configuracion").upsert(row, { onConflict: "clave" });
+      // Si el usuario tiene org, incluir en el upsert y filtrar por org
+      const rowConOrg = usuario.orgId ? { ...row, organization_id: usuario.orgId } : row;
+      const q = usuario.orgId
+        ? sb.from("configuracion").upsert(rowConOrg, { onConflict: "clave,organization_id" })
+        : sb.from("configuracion").upsert(rowConOrg, { onConflict: "clave" });
+      const { error } = await q;
       if (error) errors.push(row.clave);
     }
     if (errors.length > 0) {
@@ -5278,7 +5292,7 @@ export default function App() {
         `precio: $${ant?.precio}`, `precio: $${f.precio}, duración: ${f.duracion}min`);
     } else {
       const newId = f.id || f.nombre.toLowerCase().replace(/\s+/g,"_").replace(/[^a-z0-9_]/g,"").slice(0,20);
-      const { error } = await sb.from("servicios").insert([{ id: newId, ...row, orden: 99 }]);
+      const { error } = await sb.from("servicios").insert([{ id: newId, ...row, orden: 99, ...(usuario.orgId ? { organization_id: usuario.orgId } : {}) }]);
       if (error) { toast(error.message, "error"); return; }
       await logCambio("servicios", "crear", `Creó servicio: "${f.nombre}" — $${f.precio}`);
     }
@@ -5313,6 +5327,7 @@ export default function App() {
       const { error } = await sb.from("maquinas").insert([{
         id: newId, sucursal: sucId, tipo: f.tipo,
         capacidad: f.capacidad || "", estado: "Disponible", activa: true, orden: nextN,
+        ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
       }]);
       if (error) { toast(error.message, "error"); return; }
       await logCambio("maquinas", "crear", `Creó máquina ${newId}: ${f.tipo} — Suc ${sucId}`);
@@ -5343,7 +5358,7 @@ export default function App() {
       if (error) { toast(error.message, "error"); return; }
       toast("Proveedor actualizado", "ok");
     } else {
-      const { error } = await sb.from("proveedores").insert([{ nombre: f.nombre, contacto: f.contacto, tel: f.tel, email: f.email, productos: f.productos, notas: f.notas, activo: true }]);
+      const { error } = await sb.from("proveedores").insert([{ nombre: f.nombre, contacto: f.contacto, tel: f.tel, email: f.email, productos: f.productos, notas: f.notas, activo: true, ...(usuario.orgId ? { organization_id: usuario.orgId } : {}) }]);
       if (error) { toast(error.message, "error"); return; }
       toast("Proveedor guardado", "ok");
     }
@@ -5366,6 +5381,7 @@ export default function App() {
       sucursal: f.sucursal, solicitado_por: f.solicitadoPor,
       fecha: f.fecha, estado: "pendiente",
       tracking: trackingInicial,
+      ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
     }]);
     if (error) { toast(error.message, "error"); return; }
     await cargarDatos();
@@ -5397,7 +5413,7 @@ export default function App() {
     if (u.rol === "empleado") setSucursalActiva(u.sucursal);
     // Si tiene org_id, cargar la configuración específica de esa empresa
     if (u.orgId) {
-      const { data: cfgData } = await sb.from("configuracion").select("*").eq("org_id", u.orgId);
+      const { data: cfgData } = await sb.from("configuracion").select("*").eq("organization_id", u.orgId);
       if (cfgData && cfgData.length > 0) setCfg(mapCfg(cfgData));
     }
     await cargarUsuarios();
