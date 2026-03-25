@@ -271,7 +271,7 @@ const genId = (p) => {
 };
 const fmt = (n) => `$${Number(n).toLocaleString("es-AR")}`;
 const hoy = new Date().toLocaleDateString("es-AR");
-const APP_VERSION = "v1.001";
+const APP_VERSION = "v1.002";
 
 // Normaliza fecha en formato DD/MM/AAAA o D/M/AAAA para comparar — elimina ceros a la izquierda
 const normFecha = (f) => {
@@ -4090,10 +4090,10 @@ const Configuracion = ({ cfg, setCfg, ubicaciones, onGuardarUbicacion, onElimina
               ].map(opt => (
                 <button key={opt.key} onClick={() => setCfg({ ...cfg, [opt.key]: !cfg[opt.key] })} style={{
                   padding: "10px 20px", borderRadius: 10, border: `2px solid ${cfg[opt.key] ? opt.color : "#d0d5e8"}`,
-                  background: cfg[opt.key] ? opt.color + "18" : "#0b0b18",
-                  color: cfg[opt.key] ? opt.color : "#555", cursor: "pointer", fontFamily: "Outfit",
+                  background: cfg[opt.key] ? opt.color + "18" : "#f0f2f8",
+                  color: cfg[opt.key] ? opt.color : "#6b7280", cursor: "pointer", fontFamily: "Outfit",
                   fontSize: 14, fontWeight: cfg[opt.key] ? 600 : 400
-                }}>{cfg[opt.key] ? "✅ " : ""}{opt.label}</button>
+                }}>{cfg[opt.key] ? "✅ " : "⬜ "}{opt.label}</button>
               ))}
             </div>
           </Card>
@@ -4109,10 +4109,10 @@ const Configuracion = ({ cfg, setCfg, ubicaciones, onGuardarUbicacion, onElimina
               ].map(opt => (
                 <button key={opt.key} onClick={() => setCfg({ ...cfg, [opt.key]: !cfg[opt.key] })} style={{
                   padding: "10px 20px", borderRadius: 10, border: `2px solid ${cfg[opt.key] ? opt.color : "#d0d5e8"}`,
-                  background: cfg[opt.key] ? opt.color + "18" : "#0b0b18",
-                  color: cfg[opt.key] ? opt.color : "#555", cursor: "pointer", fontFamily: "Outfit",
+                  background: cfg[opt.key] ? opt.color + "18" : "#f0f2f8",
+                  color: cfg[opt.key] ? opt.color : "#6b7280", cursor: "pointer", fontFamily: "Outfit",
                   fontSize: 14, fontWeight: cfg[opt.key] ? 600 : 400
-                }}>{cfg[opt.key] ? "✅ " : ""}{opt.label}</button>
+                }}>{cfg[opt.key] ? "✅ " : "⬜ "}{opt.label}</button>
               ))}
             </div>
 
