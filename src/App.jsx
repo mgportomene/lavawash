@@ -1904,6 +1904,7 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
         id: genId("PAG"), pedido_id: nuevo.id, cliente_id: f.clienteId,
         monto, metodo: f.metodoPago,
         hora: horaActual(), sucursal: Number(f.sucursal), fecha: hoy,
+        ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
       }]);
     }
     setGuardando(false);
