@@ -271,7 +271,7 @@ const genId = (p) => {
 };
 const fmt = (n) => `$${Number(n).toLocaleString("es-AR")}`;
 const hoy = new Date().toLocaleDateString("es-AR");
-const APP_VERSION = "v1.002";
+const APP_VERSION = "v1.003";
 
 // Normaliza fecha en formato DD/MM/AAAA o D/M/AAAA para comparar — elimina ceros a la izquierda
 const normFecha = (f) => {
