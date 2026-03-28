@@ -271,7 +271,7 @@ const genId = (p) => {
 };
 const fmt = (n) => `$${Number(n).toLocaleString("es-AR")}`;
 const hoy = new Date().toLocaleDateString("es-AR");
-const APP_VERSION = "v1.004";
+const APP_VERSION = "v1.003";
 
 // Normaliza fecha en formato DD/MM/AAAA o D/M/AAAA para comparar — elimina ceros a la izquierda
 const normFecha = (f) => {
@@ -1081,7 +1081,7 @@ const FormCliente = ({ inicial, onGuardar, onCancelar, sucursalFija }) => {
 };
 
 // ─── CLIENTES ────────────────────────────────────────────────────────────────
-const Clientes = ({ clientes, pedidos, usuario, onGuardar, onEliminar }) => {
+const Clientes = ({ clientes, pedidos, usuario, sucursalActiva, onGuardar, onEliminar }) => {
   const [buscar, setBuscar] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -1089,7 +1089,8 @@ const Clientes = ({ clientes, pedidos, usuario, onGuardar, onEliminar }) => {
   const [confirmarElim1, setConfirmarElim1] = useState(null); // cliente — primera confirmación
   const [confirmarElim2, setConfirmarElim2] = useState(null); // cliente — segunda confirmación
 
-  const sucFija = usuario.rol === "empleado" ? usuario.sucursal : null;
+  // Empleado: solo su sucursal. Supervisor/dueño: respeta el selector de sucursal (0 = todas)
+  const sucFija = usuario.rol === "empleado" ? usuario.sucursal : (sucursalActiva && sucursalActiva !== 0 ? sucursalActiva : null);
   const lista = clientes
     .filter(c => sucFija ? c.sucursal === sucFija : true)
     .filter(c => `${c.nombre} ${c.tel} ${c.dni}`.toLowerCase().includes(buscar.toLowerCase()));
@@ -1247,13 +1248,15 @@ const Clientes = ({ clientes, pedidos, usuario, onGuardar, onEliminar }) => {
 
 // ─── FORM PEDIDO ──────────────────────────────────────────────────────────────
 
-const FormPedido = ({ clientes, usuario, onGuardar, onCancelar, onAltaCliente, pedidos: pedidosList, ubicaciones: ubicacionesList }) => {
+const FormPedido = ({ clientes, usuario, sucursalActiva, onGuardar, onCancelar, onAltaCliente, pedidos: pedidosList, ubicaciones: ubicacionesList }) => {
   const sucFija = usuario.rol === "empleado" ? usuario.sucursal : null;
+  // Pre-seleccionar la sucursal del selector si el supervisor tiene una activa
+  const sucInicial = sucFija || (sucursalActiva && sucursalActiva !== 0 ? sucursalActiva : 1);
   const mañana = new Date(); mañana.setDate(mañana.getDate() + 1);
 
   // Estado del formulario base
   const [f, setF] = useState({
-    clienteId: "", sucursal: sucFija || 1,
+    clienteId: "", sucursal: sucInicial,
     fechaEstRetiro: "", obs: "",  // vacío por defecto, el usuario decide
     estadoPago: "al_retirar", metodoPago: "",
     ubicacionCanasto: "",
@@ -1348,7 +1351,8 @@ const FormPedido = ({ clientes, usuario, onGuardar, onCancelar, onAltaCliente, p
     return acc + (s?.precio || 0);
   }, 0);
 
-  const ok = f.clienteId && servicios.some(s => s.srvId);
+  const ok = f.clienteId && servicios.some(s => s.srvId) &&
+    (f.estadoPago !== "pagado" || !!f.metodoPago);
 
   const handleGuardar = () => {
     if (!ok) return;
@@ -1541,10 +1545,14 @@ const FormPedido = ({ clientes, usuario, onGuardar, onCancelar, onAltaCliente, p
           ))}
         </div>
         {f.estadoPago === "pagado" && (
-          <Sel label="Método de pago" value={f.metodoPago} onChange={e => setF({ ...f, metodoPago: e.target.value })}>
-            <option value="">Seleccioná método</option>
-            {METODOS_PAGO.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </Sel>
+          <div>
+            <Sel label="Método de pago *" value={f.metodoPago} onChange={e => setF({ ...f, metodoPago: e.target.value })}
+              style={{ border: !f.metodoPago ? "2px solid #f87171" : undefined }}>
+              <option value="">Seleccioná método...</option>
+              {METODOS_PAGO.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </Sel>
+            {!f.metodoPago && <div style={{ color: "#f87171", fontSize: 11, marginTop: 4 }}>⚠ El método de pago es obligatorio cuando el pedido ya está pagado</div>}
+          </div>
         )}
       </div>
 
@@ -1611,6 +1619,7 @@ const FormPedido = ({ clientes, usuario, onGuardar, onCancelar, onAltaCliente, p
               </div>
             )}
             {!servicios.some(s => s.srvId) && <div style={{ color: "#b45309" }}>❌ Elegir al menos un servicio</div>}
+            {f.estadoPago === "pagado" && !f.metodoPago && <div style={{ color: "#b45309" }}>❌ Seleccioná el método de pago</div>}
           </div>
         </div>
       )}
@@ -1814,7 +1823,7 @@ const ModalTracking = ({ open, onClose, pedidoId, nroPed }) => {
   );
 };
 
-const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEstado, onConfirmarPago, onGuardarCliente, onActualizarPedido, ubicaciones, toast }) => {
+const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, sucursalActiva, onCrear, onCambiarEstado, onConfirmarPago, onGuardarCliente, onActualizarPedido, ubicaciones, toast }) => {
   const [filtro, setFiltro] = useState("Todos");
   const [busqPed, setBusqPed] = useState("");        // búsqueda por nro pedido o cliente
   const [busqTipo, setBusqTipo] = useState("pedido"); // "pedido" | "cliente"
@@ -1857,7 +1866,8 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
     }
   }, [ahora, pedidos]);
 
-  const sucFija = usuario.rol === "empleado" ? usuario.sucursal : null;
+  // Empleado: solo su sucursal. Supervisor/dueño: respeta el selector de sucursal (0 = todas)
+  const sucFija = usuario.rol === "empleado" ? usuario.sucursal : (sucursalActiva && sucursalActiva !== 0 ? sucursalActiva : null);
   const FILTROS = ["Todos", "Pendiente", "En uso", "Listo", "Entregado"];
   const FILTROS_LABEL = { "Todos":"Todos", "Pendiente":"Pendiente", "En uso":"En proceso", "Listo":"Listo", "Entregado":"Entregado" };
 
@@ -1896,17 +1906,8 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
       estadoPago: f.estadoPago, metodoPago: f.estadoPago === "pagado" ? f.metodoPago : null,
       monto, obs: f.obs, ubicacionCanasto: f.ubicacionCanasto || "",
     };
-    // onCrear inserta en DB y llama cargarDatos() — la pantalla se refresca
+    // onCrear inserta en DB, registra el pago si aplica, y llama cargarDatos()
     const creado = await onCrear(nuevo);
-    // Si ya pagó, registrar pago también
-    if (f.estadoPago === "pagado" && f.metodoPago) {
-      await sb.from("pagos").insert([{
-        id: genId("PAG"), pedido_id: nuevo.id, cliente_id: f.clienteId,
-        monto, metodo: f.metodoPago,
-        hora: horaActual(), sucursal: Number(f.sucursal), fecha: hoy,
-        ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
-      }]);
-    }
     setGuardando(false);
     setShowForm(false);
   };
@@ -2045,7 +2046,7 @@ const Pedidos = ({ pedidos, pagos, clientes, usuario, cfg, onCrear, onCambiarEst
       {showForm && (
         <Card style={{ marginBottom: 20 }} glow="#00d4ff">
           <div style={{ fontFamily: "Syne", fontSize: 16, fontWeight: 800, color: "#00d4ff", marginBottom: 16 }}>NUEVO PEDIDO</div>
-          <FormPedido clientes={clientes} usuario={usuario} onGuardar={crearPedido} onCancelar={() => setShowForm(false)} onAltaCliente={(nombre, dni) => setAltaCliModal({ open: true, nombre, dni: dni || "" })} pedidos={pedidos} ubicaciones={ubicaciones} />
+          <FormPedido clientes={clientes} usuario={usuario} sucursalActiva={sucursalActiva} onGuardar={crearPedido} onCancelar={() => setShowForm(false)} onAltaCliente={(nombre, dni) => setAltaCliModal({ open: true, nombre, dni: dni || "" })} pedidos={pedidos} ubicaciones={ubicaciones} />
         </Card>
       )}
 
@@ -5026,6 +5027,7 @@ export default function App() {
 
   // ── CRUD: Pedidos ─────────────────────────────────────────────
   const dbCrearPedido = async (pedido) => {
+    const orgPayload = usuario.orgId ? { organization_id: usuario.orgId } : {};
     const { data, error } = await sb.from("pedidos").insert([{
       id: pedido.id, cliente_id: pedido.clienteId, servicio: pedido.servicio,
       maquina: pedido.maquina, sucursal: pedido.sucursal,
@@ -5034,7 +5036,7 @@ export default function App() {
       progreso: pedido.progreso, estado_pago: pedido.estadoPago,
       metodo_pago: pedido.metodoPago, monto: pedido.monto, obs: pedido.obs,
       ubicacion_canasto: pedido.ubicacionCanasto || null,
-      ...(usuario.orgId ? { organization_id: usuario.orgId } : {}),
+      ...orgPayload,
     }]).select().single();
     if (error) { toast(error.message, "error", "Error al crear pedido"); return null; }
     // Tracking inicial
@@ -5043,6 +5045,16 @@ export default function App() {
       maquina: pedido.maquina, usuario_nombre: usuario.nombre,
       nota: "Pedido creado",
     }]);
+    // Si el pedido viene ya pagado, insertar en pagos desde el scope principal
+    // (garantiza acceso correcto a usuario.orgId)
+    if (pedido.estadoPago === "pagado" && pedido.metodoPago) {
+      await sb.from("pagos").insert([{
+        id: genId("PAG"), pedido_id: pedido.id, cliente_id: pedido.clienteId,
+        monto: pedido.monto, metodo: pedido.metodoPago,
+        hora: horaActual(), sucursal: pedido.sucursal, fecha: hoy,
+        ...orgPayload,
+      }]);
+    }
     const pedidoCreado = mapPedido(data);
     toast(`Pedido ${nroPedido(pedidoCreado)} creado`, "ok", "Pedido guardado");
     // Refrescar inmediatamente sin esperar al canal realtime
@@ -5450,10 +5462,11 @@ export default function App() {
           <main style={{ flex: 1 }}>
             {vista === "dashboard"  && <Dashboard pedidos={pedidos} pagos={pagos} clientes={clientes} sucursalActiva={sucursalActiva} usuario={usuario} />}
             {vista === "pedidos"    && <Pedidos pedidos={pedidos} pagos={pagos} clientes={clientes} usuario={usuario} cfg={cfg}
+                                         sucursalActiva={sucursalActiva}
                                          onCrear={dbCrearPedido} onCambiarEstado={dbCambiarEstado}
                                          onConfirmarPago={dbConfirmarPago} onGuardarCliente={dbGuardarCliente}
                                          onActualizarPedido={dbActualizarPedido} ubicaciones={ubicaciones} toast={toast} />}
-            {vista === "clientes"   && <Clientes clientes={clientes} pedidos={pedidos} usuario={usuario} onGuardar={dbGuardarCliente} onEliminar={dbEliminarCliente} />}
+            {vista === "clientes"   && <Clientes clientes={clientes} pedidos={pedidos} usuario={usuario} sucursalActiva={sucursalActiva} onGuardar={dbGuardarCliente} onEliminar={dbEliminarCliente} />}
             {vista === "maquinas"   && <Maquinas sucursalActiva={sucFija} pedidos={pedidos}
                                          maquinas={maquinasDB} onCambiarEstado={dbCambiarEstado}
                                          onGuardarMaquina={dbGuardarMaquina} onEliminarMaquina={dbEliminarMaquina}
